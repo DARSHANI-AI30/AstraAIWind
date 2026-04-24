@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstraWind AI - Weather Prediction & Launch Decision System</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .bg-starfield {
+            background-image: 
+                radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 100px 150px, #fcb973, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 250px 350px, #ffffff, rgba(0,0,0,0));
+            background-size: 400px 400px;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(252, 185, 115, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(252, 185, 115, 0.6); }
+        }
+        @keyframes slide-in-right {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes bounce-in {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .toast-notification { animation: slide-in-right 0.3s ease-out; }
+        .success-bounce { animation: bounce-in 0.6s ease-out; }
+        .pulse-active { animation: pulse-glow 2s infinite; }
+        .loading-shimmer {
+            background: linear-gradient(90deg, transparent, rgba(252, 185, 115, 0.2), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        .gauge-container { position: relative; width: 200px; height: 200px; }
+        .gauge-circle {
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dashoffset 1s ease-out;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#292429",
+                        "tertiary-dim": "#edb60f",
+                        "primary-dim": "#edac67",
+                        "tertiary": "#ffd574",
+                        "on-tertiary": "#624900",
+                        "secondary-dim": "#fb7185",
+                        "secondary-container": "#891933",
+                        "on-error": "#450900",
+                        "primary-container": "#d19452",
+                        "on-tertiary-fixed-variant": "#624900",
+                        "primary": "#fcb973",
+                        "tertiary-fixed": "#fdc425",
+                        "on-secondary-fixed-variant": "#96243c",
+                        "surface-container": "#1c191c",
+                        "on-secondary": "#490013",
+                        "on-surface-variant": "#b0a9ad",
+                        "on-background": "#fcf4f8",
+                        "on-primary-fixed-variant": "#6c3e00",
+                        "on-error-container": "#ffd2c8",
+                        "on-tertiary-container": "#574000",
+                        "secondary": "#fb7185",
+                        "error": "#ff7351",
+                        "surface": "#100d10",
+                        "on-secondary-container": "#ffc0c6",
+                        "surface-dim": "#100d10",
+                        "surface-container-lowest": "#000000",
+                        "on-primary-fixed": "#432500",
+                        "outline-variant": "#4b474a",
+                        "on-primary": "#5f3700",
+                        "primary-fixed-dim": "#edac67",
+                        "on-tertiary-fixed": "#3f2e00",
+                        "primary-fixed": "#fcb973",
+                        "surface-container-low": "#151216",
+                        "secondary-fixed-dim": "#ffaeb6",
+                        "outline": "#797478",
+                        "on-primary-container": "#361d00",
+                        "on-secondary-fixed": "#6e0022",
+                        "surface-bright": "#2f2b2f",
+                        "surface-container-high": "#221e22",
+                        "error-container": "#b92902",
+                        "inverse-primary": "#865417",
+                        "inverse-on-surface": "#585457",
+                        "tertiary-container": "#fdc425",
+                        "on-surface": "#fcf4f8",
+                        "tertiary-fixed-dim": "#edb60f",
+                        "surface-variant": "#292429",
+                        "surface-tint": "#fcb973",
+                        "error-dim": "#d53d18"
+                    },
+                    fontFamily: {
+                        headline: ["Space Grotesk"],
+                        body: ["Inter"],
+                        label: ["Space Grotesk"],
+                        tech: ["Rajdhani"],
+                        brand: ["Orbitron"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body min-h-screen">
+    <!-- Background Effects -->
+    <div class="fixed inset-0 bg-starfield opacity-30 pointer-events-none"></div>
+    <div class="fixed bottom-0 left-0 right-0 h-96 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none"></div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 py-3 bg-white/10 backdrop-blur-xl rounded-full mt-4 mx-auto w-[95%] max-w-7xl border border-white/15 shadow-[0_0_40px_rgba(252,185,115,0.08)]">
+        <div class="font-brand text-xl font-bold tracking-[0.2em] text-orange-200">AstraWind AI</div>
+        <div class="hidden md:flex items-center gap-8 font-headline tracking-wider uppercase text-xs">
+            <button onclick="showSection('dashboard')" class="nav-btn text-orange-200 border-b-2 border-orange-400 pb-1" data-section="dashboard">Dashboard</button>
+            <button onclick="showSection('training')" class="nav-btn text-white/60 hover:text-white/90 transition-colors" data-section="training">Training</button>
+            <button onclick="showSection('prediction')" class="nav-btn text-white/60 hover:text-white/90 transition-colors" data-section="prediction">Prediction</button>
+            <button onclick="showSection('decision')" class="nav-btn text-white/60 hover:text-white/90 transition-colors" data-section="decision">Launch Decision</button>
+        </div>
+        <div class="flex items-center gap-4">
+            <div id="backendStatus" class="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                Backend Offline
+            </div>
+            <button class="material-symbols-outlined text-white/60 hover:bg-white/5 p-2 rounded-full transition-all">notifications</button>
+            <button class="material-symbols-outlined text-white/60 hover:bg-white/5 p-2 rounded-full transition-all">settings</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-28 pb-12 px-6 max-w-7xl mx-auto">
+        
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section-content space-y-8">
+            <!-- Hero Banner -->
+            <div class="glass-panel rounded-3xl p-8 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent"></div>
+                <div class="relative z-10">
+                    <h1 class="font-brand text-4xl md:text-5xl font-black text-on-surface mb-4">
+                        Weather Intelligence
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-tertiary">Platform</span>
+                    </h1>
+                    <p class="text-white/60 max-w-2xl text-lg mb-6">
+                        Advanced LSTM-powered weather prediction system for aerospace launch decisions. 
+                        Real-time analysis of atmospheric conditions with ML-driven insights.
+                    </p>
+                    <div class="flex gap-4">
+                        <button onclick="showSection('training')" class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-3 rounded-full font-headline font-bold text-sm tracking-widest uppercase hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20">
+                            <span class="material-symbols-outlined inline-block mr-2">model_training</span>
+                            Train Model
+                        </button>
+                        <button onclick="showSection('prediction')" class="bg-white/10 text-white px-8 py-3 rounded-full font-headline font-bold text-sm tracking-widest uppercase hover:bg-white/20 active:scale-95 transition-all border border-white/20">
+                            <span class="material-symbols-outlined inline-block mr-2">insights</span>
+                            Run Prediction
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="material-symbols-outlined text-primary text-3xl">air</span>
+                        <span id="windStatus" class="text-xs text-white/40 uppercase tracking-wider">Current</span>
+                    </div>
+                    <div class="text-3xl font-tech font-bold text-on-surface" id="currentWind">-- m/s</div>
+                    <div class="text-sm text-white/40 mt-1">Wind Speed</div>
+                </div>
+                
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="material-symbols-outlined text-tertiary text-3xl">thermostat</span>
+                        <span class="text-xs text-white/40 uppercase tracking-wider">Current</span>
+                    </div>
+                    <div class="text-3xl font-tech font-bold text-on-surface" id="currentTemp">--°C</div>
+                    <div class="text-sm text-white/40 mt-1">Temperature</div>
+                </div>
+                
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="material-symbols-outlined text-secondary text-3xl">speed</span>
+                        <span class="text-xs text-white/40 uppercase tracking-wider">Current</span>
+                    </div>
+                    <div class="text-3xl font-tech font-bold text-on-surface" id="currentPressure">-- hPa</div>
+                    <div class="text-sm text-white/40 mt-1">Pressure</div>
+                </div>
+                
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="material-symbols-outlined text-green-400 text-3xl">check_circle</span>
+                        <span class="text-xs text-white/40 uppercase tracking-wider">Status</span>
+                    </div>
+                    <div class="text-3xl font-tech font-bold text-on-surface" id="modelStatus">Not Trained</div>
+                    <div class="text-sm text-white/40 mt-1">ML Model</div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-panel rounded-2xl p-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-4">Wind Speed vs Altitude</h3>
+                    <canvas id="altitudeChart" height="250"></canvas>
+                </div>
+                <div class="glass-panel rounded-2xl p-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-4">Time Series Forecast</h3>
+                    <canvas id="timeSeriesChart" height="250"></canvas>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="glass-panel rounded-2xl p-6">
+                <h3 class="font-headline text-lg font-bold text-on-surface mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button onclick="checkHealth()" class="p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-center">
+                        <span class="material-symbols-outlined text-3xl text-primary mb-2">health_and_safety</span>
+                        <div class="text-sm font-medium">Health Check</div>
+                    </button>
+                    <button onclick="fetchMetrics()" class="p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-center">
+                        <span class="material-symbols-outlined text-3xl text-tertiary mb-2">query_stats</span>
+                        <div class="text-sm font-medium">View Metrics</div>
+                    </button>
+                    <button onclick="showSection('decision')" class="p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-center">
+                        <span class="material-symbols-outlined text-3xl text-secondary mb-2">gavel</span>
+                        <div class="text-sm font-medium">Launch Decision</div>
+                    </button>
+                    <button onclick="showSection('prediction')" class="p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-center">
+                        <span class="material-symbols-outlined text-3xl text-green-400 mb-2">analytics</span>
+                        <div class="text-sm font-medium">Predictions</div>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Training Section -->
+        <section id="training" class="section-content hidden space-y-8">
+            <div class="glass-panel rounded-3xl p-8">
+                <h2 class="font-brand text-3xl font-bold text-on-surface mb-6">LSTM Model Training</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Training Controls -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="p-6 rounded-2xl bg-white/5">
+                            <h3 class="font-headline font-bold text-lg mb-4">Training Configuration</h3>
+                            <div class="space-y-4 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Model Type</span>
+                                    <span class="font-medium">LSTM Sequential</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Epochs</span>
+                                    <span class="font-medium">30</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Batch Size</span>
+                                    <span class="font-medium">32</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Optimizer</span>
+                                    <span class="font-medium">Adam</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Loss Function</span>
+                                    <span class="font-medium">MSE</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="trainBtn" onclick="trainModel()" class="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-xl font-headline font-bold tracking-wider uppercase hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20">
+                            <span id="trainBtnText">Start Training</span>
+                            <div id="trainLoader" class="hidden">
+                                <div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto"></div>
+                            </div>
+                        </button>
+                        
+                        <div id="trainingStatus" class="hidden p-4 rounded-xl bg-primary/10 border border-primary/30">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-primary">model_training</span>
+                                </div>
+                                <div>
+                                    <div class="font-medium text-sm">Training in Progress</div>
+                                    <div class="text-xs text-white/60" id="trainingEpoch">Epoch: 0/30</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 h-2 bg-white/10 rounded-full overflow-hidden">
+                                <div id="trainingProgress" class="h-full bg-gradient-to-r from-primary to-tertiary rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Training Results -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div id="trainingResults" class="hidden">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                <div class="p-4 rounded-xl bg-white/5 text-center">
+                                    <div class="text-2xl font-tech font-bold text-primary" id="finalLoss">--</div>
+                                    <div class="text-xs text-white/40 uppercase">Final Loss</div>
+                                </div>
+                                <div class="p-4 rounded-xl bg-white/5 text-center">
+                                    <div class="text-2xl font-tech font-bold text-tertiary" id="valLoss">--</div>
+                                    <div class="text-xs text-white/40 uppercase">Val Loss</div>
+                                </div>
+                                <div class="p-4 rounded-xl bg-white/5 text-center">
+                                    <div class="text-2xl font-tech font-bold text-secondary" id="rmse">--</div>
+                                    <div class="text-xs text-white/40 uppercase">RMSE</div>
+                                </div>
+                                <div class="p-4 rounded-xl bg-white/5 text-center">
+                                    <div class="text-2xl font-tech font-bold text-green-400" id="mae">--</div>
+                                    <div class="text-xs text-white/40 uppercase">MAE</div>
+                                </div>
+                            </div>
+                            
+                            <div class="p-6 rounded-2xl bg-white/5">
+                                <h4 class="font-headline font-bold mb-4">Training Loss Curve</h4>
+                                <canvas id="trainingChart" height="200"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div id="preTrainingMsg" class="p-12 rounded-2xl bg-white/5 text-center">
+                            <span class="material-symbols-outlined text-6xl text-white/20 mb-4">model_training</span>
+                            <p class="text-white/40">Click "Start Training" to begin LSTM model training</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Prediction Section -->
+        <section id="prediction" class="section-content hidden space-y-8">
+            <div class="glass-panel rounded-3xl p-8">
+                <h2 class="font-brand text-3xl font-bold text-on-surface mb-6">Wind Predictions</h2>
+                
+                <div class="mb-6">
+                    <button id="predictBtn" onclick="runPrediction()" class="bg-gradient-to-r from-tertiary to-tertiary-dim text-on-tertiary px-8 py-3 rounded-full font-headline font-bold text-sm tracking-widest uppercase hover:scale-105 active:scale-95 transition-all shadow-lg shadow-tertiary/20">
+                        <span id="predictBtnText">Generate Predictions</span>
+                    </button>
+                    <div id="predictWarning" class="hidden mt-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm">
+                        <span class="material-symbols-outlined inline-block mr-2">warning</span>
+                        Model not trained yet. Please train the model first.
+                    </div>
+                </div>
+                
+                <div id="predictionResults" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="p-6 rounded-2xl bg-gradient-to-br from-primary/20 to-transparent border border-primary/30">
+                        <div class="text-sm text-white/60 uppercase tracking-wider mb-2">15 Minutes</div>
+                        <div class="text-4xl font-tech font-bold text-primary" id="pred15min">-- m/s</div>
+                        <div class="text-xs text-white/40 mt-1">Predicted Wind Speed</div>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-gradient-to-br from-tertiary/20 to-transparent border border-tertiary/30">
+                        <div class="text-sm text-white/60 uppercase tracking-wider mb-2">30 Minutes</div>
+                        <div class="text-4xl font-tech font-bold text-tertiary" id="pred30min">-- m/s</div>
+                        <div class="text-xs text-white/40 mt-1">Predicted Wind Speed</div>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-gradient-to-br from-secondary/20 to-transparent border border-secondary/30">
+                        <div class="text-sm text-white/60 uppercase tracking-wider mb-2">60 Minutes</div>
+                        <div class="text-4xl font-tech font-bold text-secondary" id="pred60min">-- m/s</div>
+                        <div class="text-xs text-white/40 mt-1">Predicted Wind Speed</div>
+                    </div>
+                </div>
+                
+                <div id="predictionDetails" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel rounded-2xl p-6">
+                        <h4 class="font-headline font-bold mb-4">Prediction Confidence</h4>
+                        <div class="flex items-center gap-4">
+                            <div class="gauge-container relative w-32 h-32">
+                                <svg class="w-full h-full" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
+                                    <circle id="confidenceCircle" cx="50" cy="50" r="45" fill="none" stroke="#fcb973" stroke-width="10" 
+                                            stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" class="gauge-circle"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="confidenceValue" class="text-2xl font-bold">0%</span>
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-sm text-white/60 mb-2">Model Confidence</div>
+                                <div class="text-xs text-white/40">Based on prediction variance and historical accuracy</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-2xl p-6">
+                        <h4 class="font-headline font-bold mb-4">Risk Analysis</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                                <span class="text-sm">Wind Shear Alert</span>
+                                <span id="windShearAlert" class="text-sm font-medium">--</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                                <span class="text-sm">Anomaly Spikes</span>
+                                <span id="anomalySpikes" class="text-sm font-medium">--</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                                <span class="text-sm">Trend Direction</span>
+                                <span id="trendDirection" class="text-sm font-medium">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Decision Section -->
+        <section id="decision" class="section-content hidden space-y-8">
+            <div class="glass-panel rounded-3xl p-8">
+                <h2 class="font-brand text-3xl font-bold text-on-surface mb-6">Launch Decision System</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Decision Card -->
+                    <div class="space-y-6">
+                        <div id="decisionCard" class="p-8 rounded-3xl bg-white/5 border-2 border-white/10 text-center">
+                            <div class="w-32 h-32 rounded-full bg-white/10 mx-auto mb-6 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-6xl text-white/40">help</span>
+                            </div>
+                            <h3 class="text-2xl font-bold text-white/60 mb-2">Awaiting Analysis</h3>
+                            <p class="text-white/40 text-sm">Click below to get launch decision</p>
+                        </div>
+                        
+                        <button id="decisionBtn" onclick="getLaunchDecision()" class="w-full bg-gradient-to-r from-primary to-tertiary text-on-surface py-4 rounded-xl font-headline font-bold tracking-wider uppercase hover:scale-105 active:scale-95 transition-all shadow-lg">
+                            <span id="decisionBtnText">Analyze Launch Conditions</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Decision Details -->
+                    <div id="decisionDetails" class="hidden space-y-4">
+                        <div class="p-4 rounded-xl bg-white/5">
+                            <div class="text-xs text-white/40 uppercase tracking-wider mb-1">Risk Level</div>
+                            <div class="text-2xl font-bold" id="riskLevel">--</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-white/5">
+                            <div class="text-xs text-white/40 uppercase tracking-wider mb-1">Risk Percentage</div>
+                            <div class="text-2xl font-bold" id="riskPercent">--%</div>
+                            <div class="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
+                                <div id="riskBar" class="h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-white/5">
+                            <div class="text-xs text-white/40 uppercase tracking-wider mb-1">Delay Suggestion</div>
+                            <div class="text-sm" id="delaySuggestion">--</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-white/5">
+                            <div class="text-xs text-white/40 uppercase tracking-wider mb-1">Best Launch Window</div>
+                            <div class="text-sm" id="bestWindow">--</div>
+                        </div>
+                        <div class="p-4 rounded-xl bg-white/5">
+                            <div class="text-xs text-white/40 uppercase tracking-wider mb-1">Turbulence Warning</div>
+                            <div class="text-sm" id="turbulenceWarn">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-8 px-6">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-sm text-white/40">
+                © 2024 AstraWind AI. Weather Intelligence Platform.
+            </div>
+            <div class="flex gap-6">
+                <button onclick="fetchMetrics()" class="text-sm text-white/40 hover:text-primary transition-colors">Research Insights</button>
+                <a href="#" class="text-sm text-white/40 hover:text-primary transition-colors">API Documentation</a>
+                <a href="#" class="text-sm text-white/40 hover:text-primary transition-colors">Technical Specs</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Metrics Modal -->
+    <div id="metricsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-panel rounded-3xl max-w-4xl w-full max-h-[80vh] overflow-y-auto p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="font-brand text-2xl font-bold">System Metrics & Research Insights</h2>
+                <button onclick="closeMetricsModal()" class="material-symbols-outlined text-white/60 hover:text-white transition-colors">close</button>
+            </div>
+            <div id="metricsContent" class="space-y-6">
+                <!-- Content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = 'http://localhost:8000';
+        let charts = {};
+        let isTraining = false;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkHealth();
+            loadDashboardData();
+            initCharts();
+            
+            // Auto-refresh health check every 30 seconds
+            setInterval(checkHealth, 30000);
+        });
+        
+        // Show/Hide Sections
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.section-content').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show target section
+            document.getElementById(sectionId).classList.remove('hidden');
+            
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.dataset.section === sectionId) {
+                    btn.classList.add('text-orange-200', 'border-b-2', 'border-orange-400');
+                    btn.classList.remove('text-white/60');
+                } else {
+                    btn.classList.remove('text-orange-200', 'border-b-2', 'border-orange-400');
+                    btn.classList.add('text-white/60');
+                }
+            });
+        }
+        
+        // Toast Notifications
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'bg-gradient-to-r from-green-500 to-emerald-600',
+                error: 'bg-gradient-to-r from-red-500 to-rose-600',
+                warning: 'bg-gradient-to-r from-yellow-500 to-amber-600',
+                info: 'bg-gradient-to-r from-blue-500 to-indigo-600'
+            };
+            
+            const icons = {
+                success: 'check_circle',
+                error: 'error',
+                warning: 'warning',
+                info: 'info'
+            };
+            
+            toast.className = `toast-notification p-4 rounded-lg text-white shadow-2xl ${colors[type]}`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined">${icons[type]}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+        
+        // Health Check
+        async function checkHealth() {
+            try {
+                const response = await axios.get(`${API_BASE}/health`, { timeout: 5000 });
+                const status = document.getElementById('backendStatus');
+                
+                if (response.data.status === 'healthy') {
+                    status.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs';
+                    status.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> Backend Online';
+                    
+                    // Update model status
+                    if (response.data.model_trained) {
+                        document.getElementById('modelStatus').textContent = 'Trained';
+                        document.getElementById('modelStatus').className = 'text-3xl font-tech font-bold text-green-400';
+                    }
+                }
+            } catch (error) {
+                const status = document.getElementById('backendStatus');
+                status.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs';
+                status.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Backend Offline';
+            }
+        }
+        
+        // Load Dashboard Data
+        async function loadDashboardData() {
+            try {
+                const response = await axios.get(`${API_BASE}/metrics`);
+                const metrics = response.data.metrics;
+                
+                // Update weather stats
+                if (metrics.weather_statistics) {
+                    const stats = metrics.weather_statistics;
+                    if (stats.avg_wind_speed) {
+                        document.getElementById('currentWind').textContent = stats.avg_wind_speed.toFixed(1) + ' m/s';
+                    }
+                    if (stats.avg_temperature) {
+                        document.getElementById('currentTemp').textContent = stats.avg_temperature.toFixed(1) + '°C';
+                    }
+                    if (stats.avg_pressure) {
+                        document.getElementById('currentPressure').textContent = stats.avg_pressure.toFixed(1) + ' hPa';
+                    }
+                }
+                
+                // Update chart data
+                updateCharts();
+                
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+        
+        // Initialize Charts
+        function initCharts() {
+            // Altitude vs Wind Chart
+            const altitudeCtx = document.getElementById('altitudeChart');
+            if (altitudeCtx) {
+                charts.altitude = new Chart(altitudeCtx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: 'Wind Speed',
+                            data: [],
+                            backgroundColor: 'rgba(252, 185, 115, 0.6)',
+                            borderColor: '#fcb973',
+                            pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Altitude (m)', color: 'rgba(255,255,255,0.5)' },
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                            },
+                            y: {
+                                title: { display: true, text: 'Wind Speed (m/s)', color: 'rgba(255,255,255,0.5)' },
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Time Series Chart
+            const timeCtx = document.getElementById('timeSeriesChart');
+            if (timeCtx) {
+                charts.timeSeries = new Chart(timeCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Wind Speed',
+                            data: [],
+                            borderColor: '#fcb973',
+                            backgroundColor: 'rgba(252, 185, 115, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                            },
+                            y: {
+                                title: { display: true, text: 'Wind Speed (m/s)', color: 'rgba(255,255,255,0.5)' },
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.5)' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Update Charts
+        async function updateCharts() {
+            try {
+                const response = await axios.get(`${API_BASE}/chart-data`);
+                const data = response.data.chart_data;
+                
+                // Update altitude chart
+                if (charts.altitude && data.altitude_vs_wind) {
+                    charts.altitude.data.datasets[0].data = data.altitude_vs_wind.map(d => ({
+                        x: d.altitude,
+                        y: d.wind_speed
+                    }));
+                    charts.altitude.update();
+                }
+                
+                // Update time series chart
+                if (charts.timeSeries && data.time_series) {
+                    charts.timeSeries.data.labels = data.time_series.map(d => d.index);
+                    charts.timeSeries.data.datasets[0].data = data.time_series.map(d => d.wind_speed);
+                    charts.timeSeries.update();
+                }
+                
+            } catch (error) {
+                console.error('Failed to update charts:', error);
+            }
+        }
+        
+        // Train Model
+        async function trainModel() {
+            if (isTraining) return;
+            
+            isTraining = true;
+            const btn = document.getElementById('trainBtn');
+            const btnText = document.getElementById('trainBtnText');
+            const loader = document.getElementById('trainLoader');
+            const status = document.getElementById('trainingStatus');
+            const progress = document.getElementById('trainingProgress');
+            const epochDisplay = document.getElementById('trainingEpoch');
+            
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            loader.classList.remove('hidden');
+            status.classList.remove('hidden');
+            
+            showToast('Starting LSTM model training...', 'info');
+            
+            try {
+                const response = await axios.post(`${API_BASE}/train`, {}, {
+                    timeout: 120000 // 2 minute timeout for training
+                });
+                
+                const metrics = response.data.metrics;
+                const history = response.data.training_history;
+                
+                // Update training results
+                document.getElementById('finalLoss').textContent = metrics.final_loss?.toFixed(4) || '--';
+                document.getElementById('valLoss').textContent = metrics.final_val_loss?.toFixed(4) || '--';
+                document.getElementById('rmse').textContent = metrics.rmse?.toFixed(4) || '--';
+                document.getElementById('mae').textContent = metrics.mae?.toFixed(4) || '--';
+                
+                // Show results
+                document.getElementById('trainingResults').classList.remove('hidden');
+                document.getElementById('preTrainingMsg').classList.add('hidden');
+                
+                // Create training chart
+                createTrainingChart(history);
+                
+                // Update status
+                document.getElementById('modelStatus').textContent = 'Trained';
+                document.getElementById('modelStatus').className = 'text-3xl font-tech font-bold text-green-400';
+                
+                showToast('Model trained successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Training error:', error);
+                showToast('Training failed: ' + (error.response?.data?.detail || error.message), 'error');
+            } finally {
+                isTraining = false;
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                loader.classList.add('hidden');
+                status.classList.add('hidden');
+                progress.style.width = '0%';
+            }
+        }
+        
+        // Create Training Chart
+        function createTrainingChart(history) {
+            const ctx = document.getElementById('trainingChart');
+            if (!ctx) return;
+            
+            if (charts.training) {
+                charts.training.destroy();
+            }
+            
+            charts.training = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.loss.map((_, i) => `Epoch ${i + 1}`),
+                    datasets: [
+                        {
+                            label: 'Training Loss',
+                            data: history.loss,
+                            borderColor: '#fcb973',
+                            backgroundColor: 'rgba(252, 185, 115, 0.1)',
+                            fill: true
+                        },
+                        {
+                            label: 'Validation Loss',
+                            data: history.val_loss,
+                            borderColor: '#fb7185',
+                            backgroundColor: 'rgba(251, 113, 133, 0.1)',
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: 'rgba(255,255,255,0.7)' } }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: 'rgba(255,255,255,0.5)' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: 'rgba(255,255,255,0.5)' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Run Prediction
+        async function runPrediction() {
+            const btn = document.getElementById('predictBtn');
+            const btnText = document.getElementById('predictBtnText');
+            const warning = document.getElementById('predictWarning');
+            const results = document.getElementById('predictionResults');
+            const details = document.getElementById('predictionDetails');
+            
+            btn.disabled = true;
+            btnText.textContent = 'Generating...';
+            
+            try {
+                const response = await axios.post(`${API_BASE}/predict`);
+                const data = response.data;
+                
+                // Update predictions
+                document.getElementById('pred15min').textContent = data.predictions.next_15min.toFixed(1) + ' m/s';
+                document.getElementById('pred30min').textContent = data.predictions.next_30min.toFixed(1) + ' m/s';
+                document.getElementById('pred60min').textContent = data.predictions.next_60min.toFixed(1) + ' m/s';
+                
+                // Update confidence gauge
+                const confidence = data.confidence * 100;
+                document.getElementById('confidenceValue').textContent = confidence.toFixed(0) + '%';
+                const circle = document.getElementById('confidenceCircle');
+                const circumference = 2 * Math.PI * 45;
+                const offset = circumference - (confidence / 100) * circumference;
+                circle.style.strokeDashoffset = offset;
+                
+                // Update risk analysis
+                document.getElementById('windShearAlert').textContent = data.wind_shear_alert ? 'YES - High Risk' : 'No';
+                document.getElementById('windShearAlert').className = data.wind_shear_alert ? 'text-sm font-medium text-red-400' : 'text-sm font-medium text-green-400';
+                document.getElementById('anomalySpikes').textContent = data.has_anomalies ? `${data.anomaly_spikes.length} detected` : 'None';
+                document.getElementById('trendDirection').textContent = data.prediction_trend;
+                
+                // Show results
+                results.classList.remove('hidden');
+                details.classList.remove('hidden');
+                warning.classList.add('hidden');
+                
+                showToast('Predictions generated successfully!', 'success');
+                
+            } catch (error) {
+                if (error.response?.status === 400 && error.response?.data?.detail?.includes('not trained')) {
+                    warning.classList.remove('hidden');
+                    showToast('Please train the model first', 'warning');
+                } else {
+                    showToast('Prediction failed: ' + (error.response?.data?.detail || error.message), 'error');
+                }
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Generate Predictions';
+            }
+        }
+        
+        // Get Launch Decision
+        async function getLaunchDecision() {
+            const btn = document.getElementById('decisionBtn');
+            const btnText = document.getElementById('decisionBtnText');
+            const card = document.getElementById('decisionCard');
+            const details = document.getElementById('decisionDetails');
+            
+            btn.disabled = true;
+            btnText.textContent = 'Analyzing...';
+            
+            try {
+                const response = await axios.get(`${API_BASE}/decision`);
+                const data = response.data;
+                
+                // Update decision card
+                const decisionColors = {
+                    'SAFE TO LAUNCH': 'bg-green-500/20 border-green-500 text-green-400',
+                    'DELAY LAUNCH': 'bg-yellow-500/20 border-yellow-500 text-yellow-400',
+                    'HIGH WIND RISK': 'bg-red-500/20 border-red-500 text-red-400'
+                };
+                
+                const decisionIcons = {
+                    'SAFE TO LAUNCH': 'rocket_launch',
+                    'DELAY LAUNCH': 'schedule',
+                    'HIGH WIND RISK': 'warning'
+                };
+                
+                const colorClass = decisionColors[data.decision] || 'bg-white/10 border-white/20 text-white';
+                const iconName = decisionIcons[data.decision] || 'help';
+                
+                card.className = `p-8 rounded-3xl border-2 text-center transition-all duration-500 ${colorClass}`;
+                card.innerHTML = `
+                    <div class="w-32 h-32 rounded-full bg-white/10 mx-auto mb-6 flex items-center justify-center pulse-active">
+                        <span class="material-symbols-outlined text-6xl">${iconName}</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-2">${data.decision}</h3>
+                    <p class="text-sm opacity-80">Confidence: ${data.confidence.toFixed(1)}%</p>
+                `;
+                
+                // Update details
+                document.getElementById('riskLevel').textContent = data.risk_level;
+                document.getElementById('riskLevel').className = 'text-2xl font-bold ' + 
+                    (data.risk_level === 'LOW' ? 'text-green-400' : 
+                     data.risk_level === 'MEDIUM' ? 'text-yellow-400' : 'text-red-400');
+                
+                document.getElementById('riskPercent').textContent = data.risk_percent.toFixed(1) + '%';
+                document.getElementById('riskBar').style.width = data.risk_percent + '%';
+                document.getElementById('riskBar').className = 'h-full rounded-full transition-all duration-500 ' +
+                    (data.risk_percent < 30 ? 'bg-green-500' : 
+                     data.risk_percent < 70 ? 'bg-yellow-500' : 'bg-red-500');
+                
+                document.getElementById('delaySuggestion').textContent = data.delay_suggestion || 'No delay needed';
+                document.getElementById('bestWindow').textContent = data.best_launch_window;
+                document.getElementById('turbulenceWarn').textContent = data.turbulence_warning ? 
+                    `${data.turbulence_severity} - Exercise caution` : 'Low turbulence expected';
+                
+                details.classList.remove('hidden');
+                
+                showToast(`Launch decision: ${data.decision}`, data.risk_level === 'LOW' ? 'success' : 'warning');
+                
+            } catch (error) {
+                console.error('Decision error:', error);
+                showToast('Failed to get launch decision: ' + (error.response?.data?.detail || error.message), 'error');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Analyze Launch Conditions';
+            }
+        }
+        
+        // Fetch Metrics
+        async function fetchMetrics() {
+            try {
+                const response = await axios.get(`${API_BASE}/metrics`);
+                const metrics = response.data.metrics;
+                
+                const content = document.getElementById('metricsContent');
+                content.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-6 rounded-2xl bg-white/5">
+                            <h4 class="font-headline font-bold mb-4">Dataset Information</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Total Records</span>
+                                    <span class="font-medium">${metrics.dataset_info.total_records}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Features</span>
+                                    <span class="font-medium">${metrics.dataset_info.features.length}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Model Status</span>
+                                    <span class="font-medium">${metrics.model_performance.training_status}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="p-6 rounded-2xl bg-white/5">
+                            <h4 class="font-headline font-bold mb-4">Weather Statistics</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Avg Temperature</span>
+                                    <span class="font-medium">${metrics.weather_statistics.avg_temperature}°C</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Avg Wind Speed</span>
+                                    <span class="font-medium">${metrics.weather_statistics.avg_wind_speed} m/s</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-white/60">Max Wind Speed</span>
+                                    <span class="font-medium">${metrics.weather_statistics.max_wind_speed} m/s</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 rounded-2xl bg-white/5">
+                        <h4 class="font-headline font-bold mb-4">Research Insights</h4>
+                        <ul class="space-y-2 text-sm text-white/70">
+                            ${metrics.research_insights.map(insight => `<li class="flex items-start gap-2"><span class="text-primary">•</span> ${insight}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="p-6 rounded-2xl bg-white/5">
+                        <h4 class="font-headline font-bold mb-4">Recommendations</h4>
+                        <ul class="space-y-2 text-sm text-white/70">
+                            ${metrics.recommendations.map(rec => `<li class="flex items-start gap-2"><span class="text-tertiary">→</span> ${rec}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                
+                document.getElementById('metricsModal').classList.remove('hidden');
+                
+            } catch (error) {
+                showToast('Failed to load metrics: ' + (error.response?.data?.detail || error.message), 'error');
+            }
+        }
+        
+        // Close Metrics Modal
+        function closeMetricsModal() {
+            document.getElementById('metricsModal').classList.add('hidden');
+        }
+        
+        // Close modal on outside click
+        document.getElementById('metricsModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeMetricsModal();
+            }
+        });
+    </script>
+</body>
+</html>
